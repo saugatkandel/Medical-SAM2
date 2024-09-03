@@ -1,0 +1,28 @@
+#[build-system]
+#requires = ["hatchling", "hatch-vcs"]
+#build-backend = "hatchling.build"
+
+[project]
+name = "sam2_train"
+authors = [
+    {name = "Saugat Kandel"},
+]
+description = "Test version of medical-sam2"
+readme = "README.md"
+#license = {file = "LICENSE.txt"}
+#requires-python = ">=3.11"
+#classifiers = [
+#    "Development Status :: 2 - Pre-Alpha"
+#]
+
+
+# the dynamically determined project metadata attributes
+dynamic = ["version"]
+
+
+# https://hatch.pypa.io/latest/config/metadata/
+#[tool.hatch.version]
+#source = "vcs"
+
+[tool.ruff]
+extend-include = ["*.ipynb"]

@@ -35,8 +35,8 @@ import cfg
 import pandas as pd
 
 
-args = cfg.parse_args()
-device = torch.device('cuda', args.gpu_device)
+#args = cfg.parse_args()
+#device = torch.device('cuda', args.gpu_device)
 
 
 
@@ -302,7 +302,7 @@ def view(tensor):
 
 
 
-def vis_image(imgs, pred_masks, gt_masks, save_path, reverse = False, points = None):
+def vis_image(args, imgs, pred_masks, gt_masks, save_path, reverse = False, points = None):
     
     b,c,h,w = pred_masks.size()
     dev = pred_masks.get_device()

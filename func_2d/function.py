@@ -8,15 +8,15 @@ from tqdm import tqdm
 
 import cfg
 from conf import settings
-from func_2d.utils import *
+from func_2d import utils as fn2dutils
 import pandas as pd
 
 
-args = cfg.parse_args()
+#args = cfg.parse_args()
 
-GPUdevice = torch.device('cuda', args.gpu_device)
-pos_weight = torch.ones([1]).cuda(device=GPUdevice)*2
-criterion_G = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+#GPUdevice = torch.device('cuda', args.gpu_device)
+#pos_weight = torch.ones([1]).cuda(device=GPUdevice)*2
+#criterion_G = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 mask_type = torch.float32
 
 torch.backends.cudnn.benchmark = True
@@ -24,6 +24,10 @@ torch.backends.cudnn.benchmark = True
 
 def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
     
+    gpu_device = torch.device('cuda', args.gpu_device)
+    pos_weight = torch.ones([1]).cuda(device=gpu_device)*2
+    criterion_G = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
     # use bfloat16 for the entire notebook
     torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
 
@@ -51,18 +55,18 @@ def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
             to_cat_memory_pos = []
 
             # input image and gt masks
-            imgs = pack['image'].to(dtype = mask_type, device = GPUdevice)
-            masks = pack['mask'].to(dtype = mask_type, device = GPUdevice)
+            imgs = pack['image'].to(dtype = mask_type, device = gpu_device)
+            masks = pack['mask'].to(dtype = mask_type, device = gpu_device)
             name = pack['image_meta_dict']['filename_or_obj']
 
             # click prompt: unsqueeze to indicate only one click, add more click across this dimension
             if 'pt' in pack:
-                pt_temp = pack['pt'].to(device = GPUdevice)
+                pt_temp = pack['pt'].to(device = gpu_device)
                 pt = pt_temp.unsqueeze(1)
-                point_labels_temp = pack['p_label'].to(device = GPUdevice)
+                point_labels_temp = pack['p_label'].to(device = gpu_device)
                 point_labels = point_labels_temp.unsqueeze(1)
-                coords_torch = torch.as_tensor(pt, dtype=torch.float, device=GPUdevice)
-                labels_torch = torch.as_tensor(point_labels, dtype=torch.int, device=GPUdevice)
+                coords_torch = torch.as_tensor(pt, dtype=torch.float, device=gpu_device)
+                labels_torch = torch.as_tensor(point_labels, dtype=torch.int, device=gpu_device)
             else:
                 coords_torch = None
                 labels_torch = None
@@ -177,9 +181,9 @@ def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
             # maskmem_pos_enc: [torch.Size([batch, 64, 64, 64])]
                 
             maskmem_features = maskmem_features.to(torch.bfloat16)
-            maskmem_features = maskmem_features.to(device=GPUdevice, non_blocking=True)
+            maskmem_features = maskmem_features.to(device=gpu_device, non_blocking=True)
             maskmem_pos_enc = maskmem_pos_enc[0].to(torch.bfloat16)
-            maskmem_pos_enc = maskmem_pos_enc.to(device=GPUdevice, non_blocking=True)
+            maskmem_pos_enc = maskmem_pos_enc.to(device=gpu_device, non_blocking=True)
 
 
             # add single maskmem_features, maskmem_pos_enc, iou
@@ -239,6 +243,11 @@ def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
 
 
 def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
+
+        
+    gpu_device = torch.device('cuda', args.gpu_device)
+    pos_weight = torch.ones([1]).cuda(device=gpu_device)*2
+    criterion_G = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     # use bfloat16 for the entire notebook
     torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
@@ -408,7 +417,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                 # binary mask and calculate loss, iou, dice
                 total_loss += lossfunc(pred, masks)
                 pred = (pred> 0.5).float()
-                temp = eval_seg(pred, masks, threshold)
+                temp = fn2dutils.eval_seg(pred, masks, threshold)
                 total_eiou += temp[0]
                 total_dice += temp[1]
 
@@ -418,7 +427,7 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                     for na in name:
                         img_name = na
                         namecat = namecat + img_name + '+'
-                    vis_image(imgs,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=None)
+                    fn2dutils.vis_image(args, imgs,pred, masks, os.path.join(args.path_helper['sample_path'], namecat+'epoch+' +str(epoch) + '.jpg'), reverse=False, points=None)
                             
             pbar.update()
 
