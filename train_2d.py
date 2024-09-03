@@ -19,8 +19,8 @@ import cfg
 import func_2d.function as function
 from conf import settings
 #from models.discriminatorlayer import discriminator
-from func_2d.dataset import *
-from func_2d.utils import *
+from func_2d.dataset import REFUGE
+from func_2d import utils as fn2dutils
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
     args = cfg.parse_args()
     GPUdevice = torch.device('cuda', args.gpu_device)
 
-    net = get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
+    net = fn2dutils.get_network(args, args.net, use_gpu=args.gpu, gpu_device=GPUdevice, distribution = args.distributed)
 
     # optimisation
     optimizer = optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
@@ -44,8 +44,8 @@ def main():
 
     '''load pretrained model'''
 
-    args.path_helper = set_log_dir('logs', args.exp_name)
-    logger = create_logger(args.path_helper['log_path'])
+    args.path_helper = fn2dutils.set_log_dir('logs', args.exp_name)
+    logger = fn2dutils.create_logger(args.path_helper['log_path'])
     logger.info(args)
 
 
