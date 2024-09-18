@@ -1,6 +1,7 @@
 
 import os
 
+import functorch.compile
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +22,16 @@ mask_type = torch.float32
 
 torch.backends.cudnn.benchmark = True
 
+@torch.compile
+def _resize_prediction(low_res_multimasks, args):
+    pred = F.interpolate(low_res_multimasks, size=(args.out_size, args.out_size))
+    high_res_multimasks = F.interpolate(
+        low_res_multimasks,
+        size=(args.image_size, args.image_size),
+        mode="bilinear",
+        align_corners=False,
+    )
+    return pred, high_res_multimasks
 
 def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
     
@@ -180,9 +191,10 @@ def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
             
             
             # resize prediction
-            pred = F.interpolate(low_res_multimasks,size=(args.out_size,args.out_size))
-            high_res_multimasks = F.interpolate(low_res_multimasks, size=(args.image_size, args.image_size),
-                                                mode="bilinear", align_corners=False)
+            # pred = F.interpolate(low_res_multimasks,size=(args.out_size,args.out_size))
+            # high_res_multimasks = F.interpolate(low_res_multimasks, size=(args.image_size, args.image_size),
+            #                                    mode="bilinear", align_corners=False)
+            pred, high_res_multimasks = _resize_prediction(low_res_multimasks, args)
             
 
             '''memory encoder'''       
@@ -255,12 +267,14 @@ def train_sam(args, net: nn.Module, optimizer, train_loader, epoch, writer):
 
             pbar.update()
 
-    return epoch_loss/len(train_loader)
+    return epoch_loss / len(train_loader), memory_bank_list
 
 
 
 
-def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
+def validation_sam(
+    args, val_loader, epoch, net: nn.Module, writer, memory_bank_list=None, clean_dir=True
+):
 
         
     gpu_device = torch.device('cuda', args.gpu_device)
@@ -285,7 +299,8 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
 
     # init
     lossfunc = criterion_G
-    memory_bank_list = []
+    if memory_bank_list is None:
+        memory_bank_list = []
     feat_sizes = [(256, 256), (128, 128), (64, 64)]
     total_loss = 0
     total_eiou = 0
@@ -341,7 +356,8 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
                     memory_pos_stack_ori = torch.stack(to_cat_memory_pos, dim=0)
                     image_embed_stack_ori = torch.stack(to_cat_image_embed, dim=0)
 
-                    vision_feats_temp = vision_feats[-1].permute(1, 0, 2).view(B, -1, 64, 64) 
+                    vision_feats_temp = vision_feats[-1].permute(1, 0, 2).view(B, -1, 64, 64)
+                    # vision_feats_temp = vision_feats[-1].permute(1, 0, 2).reshape(B, -1, 64, 64)
                     vision_feats_temp = vision_feats_temp.reshape(B, -1)
 
                     image_embed_stack_ori = F.normalize(image_embed_stack_ori, p=2, dim=1)
@@ -369,7 +385,10 @@ def validation_sam(args, val_loader, epoch, net: nn.Module, clean_dir=True):
 
                 feats = [feat.permute(1, 2, 0).view(B, -1, *feat_size) 
                         for feat, feat_size in zip(vision_feats[::-1], feat_sizes[::-1])][::-1]
-                
+
+                # feats = [feat.permute(1,2,0).reshape(B, -1, *feat_size)
+                #         for feat, feat_size in zip(vision_feats[::-1], feat_sizes[::-1])][::-1]
+
                 image_embed = feats[-1]
                 high_res_feats = feats[:-1]
 

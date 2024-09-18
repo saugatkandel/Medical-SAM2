@@ -40,12 +40,11 @@ import pandas as pd
 
 
 
-def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
+def get_network(args, gpu_device=0):
     """ return given network
     """
 
-
-    if net == 'sam2':
+    if args.model_id == "sam2":
         from sam2_train.build_sam import build_sam2
         from sam2_train.sam2_image_predictor import SAM2ImagePredictor
         torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
@@ -53,6 +52,7 @@ def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
             # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
+        print("Building SAM2 model...")
         net = build_sam2(args.sam_config, args.sam_ckpt, device="cuda")
 
 
@@ -60,9 +60,9 @@ def get_network(args, net, use_gpu=True, gpu_device = 0, distribution = True):
         print('the network name you have entered is not supported yet')
         sys.exit()
 
-    if use_gpu:
+    if args.gpu:
         #net = net.cuda(device = gpu_device)
-        if distribution != 'none':
+        if args.distributed != "none":
             net = torch.nn.DataParallel(net,device_ids=[int(id) for id in args.distributed.split(',')])
             net = net.to(device=gpu_device)
         else:

@@ -183,7 +183,7 @@ class SAM2Base(torch.nn.Module):
             )
             self.image_encoder.forward = torch.compile(
                 self.image_encoder.forward,
-                mode="max-autotune",
+                mode="reduce-overhead",
                 fullgraph=True,
                 dynamic=False,
             )
